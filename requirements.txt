@@ -1,0 +1,13 @@
+# Web app
+Flask>=3.0
+
+# Browser automation used by every scraper in scrapers/
+playwright>=1.44
+
+# Article summarization for blog descriptions
+newspaper3k>=0.2.8
+lxml_html_clean>=0.1.1   # newspaper3k depends on lxml.html.clean, split out of lxml in newer releases
+nltk>=3.8
+
+# X.com (Twitter) scraping used by scrapers/x_scraper.py
+Scweet>=3.0

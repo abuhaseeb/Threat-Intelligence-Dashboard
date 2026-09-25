@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Signal Desk — Threat Intel Aggregator{% endblock %}
+
+{% macro platform_panel(key, cfg) %}
+<section class="panel" data-platform="{{ key }}" hidden>
+  <form class="run-form" data-platform="{{ key }}" autocomplete="off">
+    <div class="run-form__row">
+      {% if cfg.searchable %}
+      <label class="field">
+        <span class="field__label">{{ 'Account' if cfg.category == 'social' else 'Source' }}</span>
+        <input
+          type="text"
+          name="target"
+          value="{{ cfg.default_target }}"
+          placeholder="{{ cfg.target_placeholder or '' }}"
+        >
+      </label>
+      {% else %}
+      <div class="field field--static">
+        <span class="field__label">Source</span>
+        <span class="field__static-value">
+          {{ cfg.label }} — {{ 'top trending records' if cfg.category == 'trending' else 'latest reports' }}
+        </span>
+      </div>
+      {% endif %}
+
+      {% if cfg.needs_auth_token %}
+      <label class="field">
+        <span class="field__label">auth_token</span>
+        <input
+          type="password"
+          name="auth_token"
+          placeholder="paste your X auth_token"
+          autocomplete="off"
+        >
+      </label>
+      {% endif %}
+
+      {% if cfg.default_limit %}
+      <label class="field field--narrow">
+        <span class="field__label">Count</span>
+        <input type="number" name="limit" value="{{ cfg.default_limit }}" min="1" max="50">
+      </label>
+      {% endif %}
+
+      <button type="submit" class="btn btn--run">Run scrape</button>
+    </div>
+    {% if cfg.needs_auth_token %}
+    <p class="field__hint">Used only for this request. It is never written to disk or logged.</p>
+    {% endif %}
+    {% if key == 'threatfox' %}
+    <p class="field__hint">
+      Opens a visible (non-headless) browser and may pause with an hCaptcha to solve —
+      watch the terminal running <code>app.py</code> for a prompt to press Enter once it's done.
+    </p>
+    {% endif %}
+  </form>
+
+  <div class="status" data-role="status"></div>
+
+  {% if cfg.category == 'trending' %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead data-role="table-head"></thead>
+      <tbody data-role="table-body">
+        <tr class="empty-row">
+          <td colspan="99">No results yet for {{ cfg.label }}. Run a scrape above.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="results" data-role="results">
+    <div class="empty-state">
+      <p>No results yet for {{ cfg.label }}.</p>
+      <p class="empty-state__sub">Run a scrape above to pull the latest posts and extracted IOCs.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="export-bar" data-role="export-bar" hidden>
+    <span class="export-bar__count" data-role="export-count"></span>
+    <div class="export-bar__actions">
+      <a class="btn btn--ghost" data-role="export-json" href="/api/export/{{ key }}/json">Export JSON</a>
+      <a class="btn btn--ghost" data-role="export-csv" href="/api/export/{{ key }}/csv">Export CSV</a>
+    </div>
+  </div>
+</section>
+{% endmacro %}
+
+{% block body %}
+<div class="page">
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__mark">SD</span>
+      <div>
+        <h1 class="topbar__title">Signal Desk</h1>
+        <p class="topbar__subtitle">Compiled OSINT: social posts and vendor research, with IOCs pulled out</p>
+      </div>
+    </div>
+  </header>
+
+  <nav class="category-switch" role="tablist" aria-label="Source category">
+    <button class="category-switch__btn is-active" data-category="social" role="tab" aria-selected="true">
+      Social media
+    </button>
+    <button class="category-switch__btn" data-category="blog" role="tab" aria-selected="false">
+      Research blogs
+    </button>
+    <button class="category-switch__btn" data-category="trending" role="tab" aria-selected="false">
+      Trending Malware
+    </button>
+  </nav>
+
+  <div class="category-view" data-category="social">
+    <nav class="platform-tabs" aria-label="Social media platform">
+      {% for key, cfg in social_platforms.items() %}
+      <button class="platform-tabs__btn{% if loop.first %} is-active{% endif %}" data-platform-tab="{{ key }}">
+        {{ cfg.label }}
+      </button>
+      {% endfor %}
+    </nav>
+    {% for key, cfg in social_platforms.items() %}
+      {{ platform_panel(key, cfg) }}
+    {% endfor %}
+  </div>
+
+  <div class="category-view" data-category="blog" hidden>
+    <nav class="platform-tabs" aria-label="Research blog">
+      {% for key, cfg in blog_platforms.items() %}
+      <button class="platform-tabs__btn{% if loop.first %} is-active{% endif %}" data-platform-tab="{{ key }}">
+        {{ cfg.label }}
+      </button>
+      {% endfor %}
+    </nav>
+    {% for key, cfg in blog_platforms.items() %}
+      {{ platform_panel(key, cfg) }}
+    {% endfor %}
+  </div>
+
+  <div class="category-view" data-category="trending" hidden>
+    <p class="trending-panel__intro">
+      Top-20 tables pulled straight from three trackers — ANY.RUN's malware trends,
+      Malpedia's family list, and ThreatFox's recent IOC submissions — each shown with
+      every field that source provides, and a link on each row back to that record's
+      page on the source site.
+    </p>
+    <nav class="platform-tabs" aria-label="Trending malware source">
+      {% for key, cfg in trending_platforms.items() %}
+      <button class="platform-tabs__btn{% if loop.first %} is-active{% endif %}" data-platform-tab="{{ key }}">
+        {{ cfg.label }}
+      </button>
+      {% endfor %}
+    </nav>
+    {% for key, cfg in trending_platforms.items() %}
+      {{ platform_panel(key, cfg) }}
+    {% endfor %}
+  </div>
+</div>
+
+<template id="row-template">
+  <article class="result-card">
+    <header class="result-card__head">
+      <div>
+        <p class="result-card__account"></p>
+        <h3 class="result-card__title"></h3>
+      </div>
+      <span class="result-card__meta"></span>
+    </header>
+    <p class="result-card__desc"></p>
+    <div class="result-card__iocs"></div>
+    <a class="result-card__link" target="_blank" rel="noopener">Open source</a>
+  </article>
+</template>
+{% endblock %}
